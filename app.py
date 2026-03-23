@@ -1,89 +1,98 @@
-import os  # Добавь это в начало файла
-from aiohttp import web  # Добавь этот импорт в самый верх файла!
-import asyncio
+import os
 import logging
+import asyncio
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types
+from aiogram.types import Update
 
-# 1. ТВОЙ ТОКЕН (Вставь его сюда)
-API_TOKEN = os.getenv("BOT_TOKEN") 
+API_TOKEN = os.getenv("BOT_TOKEN")
+if not API_TOKEN:
+    raise ValueError("BOT_TOKEN не задан в переменных окружения")
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
+# --- Логика модерации (без изменений) ---
 @dp.message()
 async def moderator_logic(message: types.Message):
-    # 1. ПРОПУСКАЕМ: сообщения от самого бота, от имени каналов/групп и сервисные сообщения
     if message.from_user is None or message.from_user.is_bot:
         return
-
-    # 2. ОПРЕДЕЛЯЕМ ID ТЕМЫ И ТЕКСТ
     tid = message.message_thread_id
     text = message.text.lower() if message.text else ""
-    
-    # Твой основной код фильтрации ниже...
     print(f">>> Сообщение от {message.from_user.full_name} в теме ID: {tid}")
-    
-    # Дальше идут твои проверки (if tid == 1142 и т.д.)
-
-    
-    
-    # ЭТА СТРОЧКА ПОКАЖЕТ ID В ТЕРМИНАЛЕ (Смотри туда!)
     print(f">>> Сообщение в теме ID: {tid} | Текст: {text[:20]}...")
-
-    # --- ЗДЕСЬ НАСТРОЙКИ ФИЛЬТРОВ ---
-
-   # 1. ТЕМА: ВОДИТЕЛИ (ID: 1142)
-    if tid in [32320, 28845]: 
-        # Если человек пишет "ищу" или "нужно" в водителях — УДАЛЯЕМ (это пассажир)
+    
+    # ВОДИТЕЛИ
+    if tid in [32320, 28845]:
         if any(bad_word in text for bad_word in ['ищу', 'нужно', 'пассажир', 'надо']):
             await message.delete()
             print(f"[-] Удален пассажир из темы Водителей: {text[:20]}")
-        
-        # В остальном проверяем обычные слова водителя
         elif not any(word in text for word in ['еду','водитель', 'выезжаю', 'возьму', 'выезд', 'мест', 'маршрут', '-', '—']):
             await message.delete()
             print(f"[-] Удалено (не по шаблону) из Водителей")
-
-        # 2. ТЕМА: ПАССАЖИРЫ (ID: 1143)
-    if tid in [32324, 28846]: 
-        # Если в тексте НЕТ ни одного из этих слов — УДАЛЯЕМ
+    
+    # ПАССАЖИРЫ
+    if tid in [32324, 28846]:
         if not any(word in text for word in ['ищу', 'пассажир', 'нужно', 'едет', 'надо', 'кто', 'едет', 'подвезет']):
             try:
                 await message.delete()
                 print(f"[-] УДАЛЕНО из Пассажиров: {text}")
             except Exception as e:
                 print(f"Ошибка удаления: {e}")
-
-    # 3. ТЕМА: ПЕРЕДАЧИ (Замени 6 на свое число из терминала)
+    
+    # ПЕРЕДАЧИ (замените ID на актуальный)
     elif tid == 10:
         if not any(word in text for word in ['передать', 'сумку', 'пакет', 'передачу']):
             await message.delete()
             print(f"[-] Удалено из Передач")
-
-    # 4. ТЕМА: ПОМОЩЬ (Замени 10 на свое число из терминала)
-    elif tid == 10:
+    
+    # ПОМОЩЬ (замените ID на актуальный)
+    elif tid == 1139:
         if not any(word in text for word in ['помогите', 'сломался', 'трос', 'запаска']):
             await message.delete()
             print(f"[-] Удалено из Помощи")
 
+# --- Обработчик вебхука ---
+async def webhook_handler(request):
+    json_data = await request.json()
+    update = Update(**json_data)
+    await dp.feed_update(bot, update)
+    return web.Response(text="OK")
 
-async def handle(request):
-    return web.Response(text="Бот работает 24/7!")
+async def set_webhook():
+    public_url = os.getenv("PUBLIC_URL")
+    if not public_url:
+        logging.error("PUBLIC_URL не задан, вебхук не будет установлен")
+        return
+    webhook_url = f"{public_url}/webhook"
+    await bot.set_webhook(webhook_url, drop_pending_updates=True)
+    logging.info(f"Вебхук установлен: {webhook_url}")
+
+async def on_shutdown(app):
+    logging.info("Остановка, удаляем вебхук...")
+    await bot.delete_webhook()
+    await bot.session.close()
 
 async def main():
-    # 1. Запускаем фоновый веб-сервер
+    # Устанавливаем вебхук при старте
+    await set_webhook()
+    
+    # Создаём веб-приложение
     app = web.Application()
-    app.router.add_get("/", handle)
+    app.router.add_post("/webhook", webhook_handler)
+    app.router.add_get("/", lambda request: web.Response(text="Bot is running"))
+    app.on_shutdown.append(on_shutdown)
+    
+    # Порт для прослушивания (из переменной окружения или 7860 по умолчанию)
+    port = int(os.getenv("PORT", 7860))
     runner = web.AppRunner(app)
     await runner.setup()
-    # Порт 7860 обязателен для Hugging Face
-    site = web.TCPSite(runner, "0.0.0.0", 7860)
+    site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
     
-    print(">>> Бот запущен и веб-сервер активен!")
-    
-    # 2. Запускаем самого бота
-    await dp.start_polling(bot)
+    logging.info(f"Сервер запущен на порту {port}")
+    # Бесконечно ждём (сервер работает)
+    await asyncio.Event().wait()
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
