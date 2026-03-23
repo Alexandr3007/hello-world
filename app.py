@@ -24,7 +24,7 @@ async def moderator_logic(message: types.Message):
     
     # ВОДИТЕЛИ
     if tid in [32320, 28845]:
-        if any(bad_word in text for bad_word in ['ищу', 'нужно', 'может', 'пассажир', 'надо']):
+        if any(bad_word in text for bad_word in ['ищу', 'нужно', 'может', 'надо']):
             await message.delete()
             print(f"[-] Удален пассажир из темы Водителей: {text[:20]}")
         elif not any(word in text for word in ['еду','водитель', 'выезжаю', 'возьму', 'выезд', 'маршрут']):
