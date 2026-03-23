@@ -55,7 +55,7 @@ async def moderator_logic(message: types.Message):
                 print(f"Ошибка удаления: {e}")
 
     # 3. ТЕМА: ПЕРЕДАЧИ (Замени 6 на свое число из терминала)
-    elif tid == 1139:
+    elif tid == 10:
         if not any(word in text for word in ['передать', 'сумку', 'пакет', 'передачу']):
             await message.delete()
             print(f"[-] Удалено из Передач")
