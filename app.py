@@ -12,7 +12,7 @@ if not API_TOKEN:
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
-# --- Логика модерации (без изменений) ---
+# --- Логика модерации (без изменений, но проверьте ID тем) ---
 @dp.message()
 async def moderator_logic(message: types.Message):
     if message.from_user is None or message.from_user.is_bot:
@@ -40,7 +40,7 @@ async def moderator_logic(message: types.Message):
             except Exception as e:
                 print(f"Ошибка удаления: {e}")
     
-    # ПЕРЕДАЧИ (замените ID на актуальный)
+    # ПЕРЕДАЧИ
     elif tid == 10:
         if not any(word in text for word in ['передать', 'сумку', 'пакет', 'передачу']):
             await message.delete()
@@ -60,9 +60,10 @@ async def webhook_handler(request):
     return web.Response(text="OK")
 
 async def set_webhook():
-    public_url = os.getenv("PUBLIC_URL")
+    # Получаем публичный URL сервиса на Render
+    public_url = os.getenv("RENDER_EXTERNAL_URL")
     if not public_url:
-        logging.error("PUBLIC_URL не задан, вебхук не будет установлен")
+        logging.error("RENDER_EXTERNAL_URL не задан. Проверьте, что это веб-сервис на Render.")
         return
     webhook_url = f"{public_url}/webhook"
     await bot.set_webhook(webhook_url, drop_pending_updates=True)
@@ -74,7 +75,7 @@ async def on_shutdown(app):
     await bot.session.close()
 
 async def main():
-    # Устанавливаем вебхук при старте
+    # Устанавливаем вебхук
     await set_webhook()
     
     # Создаём веб-приложение
@@ -83,8 +84,8 @@ async def main():
     app.router.add_get("/", lambda request: web.Response(text="Bot is running"))
     app.on_shutdown.append(on_shutdown)
     
-    # Порт для прослушивания (из переменной окружения или 7860 по умолчанию)
-    port = int(os.getenv("PORT", 7860))
+    # Порт для Render: используем переменную PORT (по умолчанию 10000)
+    port = int(os.getenv("PORT", 10000))
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", port)
