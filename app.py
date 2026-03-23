@@ -1,10 +1,11 @@
+import os  # Добавь это в начало файла
 from aiohttp import web  # Добавь этот импорт в самый верх файла!
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher, types
 
 # 1. ТВОЙ ТОКЕН (Вставь его сюда)
-API_TOKEN = '8612980599:AAHBegAQJ6VXLso-s-dUW5GJ8Wi8__9NFgo'
+API_TOKEN = os.getenv("BOT_TOKEN") 
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
